@@ -1,11 +1,7 @@
 import numpy as np
 import pygame
 import matplotlib.pyplot as plt
-import plotly.figure_factory as ff
-import plotly.graph_objects as go
 import os
-import torch
-from torch.autograd.functional import hessian
 import sys
 
 
@@ -121,7 +117,6 @@ class Vortex_interaction():
             detH = (dwdx2*dwdy2)-(dwdxy*dwdyx)
 
             lastsignx, lastsigny = 1, 1
-            j = np.transpose(j)
             xlist = []
             ylist = []
 
@@ -129,7 +124,7 @@ class Vortex_interaction():
                 signx = dx/np.abs(dx)
                 if signx != lastsignx:
                     lastsignx = signx
-                    print(x)
+                    #xlist.append(x)
             for y,dy in zip(j, dwdy):
                 signy = dy/np.abs(dy)
                 if signy != lastsigny:
