@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import os
 import sys
 
-
 #initialize pygame and plot generation
 pygame.init()
 
@@ -24,7 +23,7 @@ dt =  .1                                     #<--timestep, lower means more accu
 Sim_type = 'Core Growth'                     #<--Choose whether to run point vortex or coregrowth simulation
 Simulation = False                           #<--choose wether or not you want to see the simulation as it runs
 Strength = -1, .5, .5                         #<--Choose initial vortex strengths here
-SupremeCounter = 1e5                         #<--number of iterations until loop breaks
+SupremeCounter = 1e3                         #<--number of iterations until loop breaks
 viscosity = 1e3                              #<--Choose a viscosity of the fluid here
 
 #Point vortexs are defined here
@@ -101,6 +100,9 @@ class Vortex_interaction():
         Vort = np.zeros((len(x),len(y)))
         dwdx = np.zeros((len(x), len(y)))
         dwdy = np.zeros((len(x), len(y)))
+        dwdx2 = np.zeros((len(x),len(y)))
+        dwdy2 = np.zeros((len(x),len(y)))
+        dwdxdy = np.zeros((len(x),len(y)))
         dx = np.gradient(x).mean()
         dy = np.gradient(y).mean()
         crit_points = []
@@ -110,14 +112,18 @@ class Vortex_interaction():
                 Vort[i,j] = ((vortices[0].Vstrength/(4*np.pi*viscosity*t))*np.exp(-1*(np.abs(z-vortices[0].position)**2)/(4*viscosity*t)))+ ((vortices[1].Vstrength/(4*np.pi*viscosity*t))*np.exp(-1*(np.abs(z-vortices[1].position)**2)/(4*viscosity*t)))+((vortices[2].Vstrength/(4*np.pi*viscosity*t))*np.exp(-1*(np.abs(z-vortices[2].position)**2)/(4*viscosity*t)))
         for j in range(len(y)):
             dwdx[:, j] = np.divide(np.gradient(Vort[:,j]), dx)
+            dwdx2[:, j] = np.divide(np.gradient(dwdx[:,j]), dx)
+            dwdxdy[:, j] = np.divide(np.gradient(dwdx[:,j]),dy)
         for i in range(len(x)):
             dwdy[i, :] = np.divide(np.gradient(Vort[i,:]), dy)
+            dwdy2[i, :] = np.divide(np.gradient(dwdy[i,:]), dy)
         for i in range(len(x)):
             for j in range(len(y)):
                 signx = dwdx[i,j]/np.abs(dwdx[i,j])
                 nextsignx = dwdx[i-1,j]/np.abs(dwdx[i-1,j])
                 signy = dwdy[i,j]/np.abs(dwdy[i,j])
                 nextsigny = dwdy[i, j-1]/np.abs(dwdy[i,j-1])
+                detH = dwdx2*dwdy2-dwdxdy**2
                 if signx != nextsignx and signy !=nextsigny:
                     if dwdx[i,j] == 0:
                         xcoord = x[i]+1j*y[j]
@@ -137,42 +143,7 @@ class Vortex_interaction():
                     zed = (xcoord+ycoord)/2
                     crit_points.append((np.real(zed), np.imag(zed)))
         self.critical_points.append(crit_points)
-
-        
-
-    '''
-    def crit_points(self, Vorticity, ex, why):
-        Y = np.transpose(why)
-        vorticityforY = np.transpose(Vorticity)
-        for i,j,k,k_y in zip(ex, Y, Vorticity, vorticityforY):
-            xstep = np.gradient(i)
-            ystep = np.gradient(j)
-            dwdx = np.divide(np.gradient(k), np.gradient(i))
-            dwdy = np.divide(np.gradient(k_y), np.gradient(j))
-            dwdx2 = np.divide(np.gradient(dwdx), np.gradient(i))
-            dwdy2 = np.divide(np.gradient(dwdy), np.gradient(j))
-            dwdy = np.transpose(dwdy)
-            dwdy2 = np.transpose(dwdy2)
-            dwdxy = np.divide(np.gradient(dwdy), np.gradient(i))
-            dwdyx = np.divide(np.gradient(dwdx), np.gradient(j))
-            detH = (dwdx2*dwdy2)-(dwdxy*dwdyx)
-
-            lastsignx, lastsigny = 1, 1
-            xlist = []
-            ylist = []
-
-            for x, dx in zip(i, dwdx):
-                signx = dx/np.abs(dx)
-                if signx != lastsignx:
-                    lastsignx = signx
-                    for y, dy in zip(j, dwdy):
-                        signy = dy/np.abs(dy)
-                        if signy != lastsigny:
-                            lastsigny = signy
-                            self.Vort_peak.append((x,y))
-
-            '''
-        
+        print(detH)
 
 
     def findStreamlines(self, v1, v2, v3, t):
@@ -226,7 +197,7 @@ while run == True:
 
     if Sim_type == 'Core Growth':
         vortexs.updateCGvortexes(V1, V2, V3, t)
-        if t%100 == 0:
+        if t%40 == 0:
             vortexs.findStreamlines(V1, V2, V3, t)
             vortexs.vorticity_field((V1,V2,V3), t)
     if Simulation == False:
