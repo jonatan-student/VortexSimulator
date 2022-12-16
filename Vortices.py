@@ -3,7 +3,7 @@ import pygame
 import matplotlib.pyplot as plt
 import os
 import sys
-
+import pandas as pd
 #initialize pygame and plot generation
 pygame.init()
 
@@ -12,19 +12,24 @@ if not os.path.exists("Figures"):
 
 #__________glbl variables____________
 #display stuff
-SCREEN_HEIGHT = 900
-SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 2
+SCREEN_WIDTH = 2
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 FONT = pygame.font.Font(pygame.font.get_default_font(), 20)
 
 #simulation stuff
-ZeroZero =  SCREEN_WIDTH/2, SCREEN_HEIGHT/2  #<--recenter (0,0) coordinate in center of graph
-dt =  .1                                     #<--timestep, lower means more accurate
+ZeroZero =  0, 0                             #<--recenter (0,0) coordinate in center of graph
+dt =  .01                                     #<--timestep, lower means more accurate
 Sim_type = 'Core Growth'                     #<--Choose whether to run point vortex or coregrowth simulation
 Simulation = False                           #<--choose wether or not you want to see the simulation as it runs
 Strength = -1, .5, .5                         #<--Choose initial vortex strengths here
-SupremeCounter = 1e3                         #<--number of iterations until loop breaks
-viscosity = 1e3                              #<--Choose a viscosity of the fluid here
+SupremeCounter = 1e4                         #<--number of iterations until loop breaks
+viscosity = .02                               #<--Choose a viscosity of the fluid here
+if Sim_type == 'Point Vortex':
+    SCREEN_HEIGHT = 900
+    SCREEN_WIDTH = 900
+    ZeroZero =  SCREEN_WIDTH/2, SCREEN_HEIGHT/2  #<--recenter (0,0) coordinate in center of graph
+
 
 #Point vortexs are defined here
 class pvortex():
@@ -94,36 +99,46 @@ class Vortex_interaction():
         v2.movepeak(self.V1, self.V3,t)
         v3.movepeak(self.V1, self.V2,t)
 
+    def labelCrits(self, x, y, vortices, t):
+        coefficient = (1/(4*np.pi*viscosity*t))*((-1/(2*viscosity*t))**2)
+        z = x +1j*y
+        dw2dx2 = np.sum([v.Vstrength*(x**2-2*x*np.real(v.position)+np.real(v.position)**2-2*(viscosity*t))*np.exp(-((x-np.real(v.position))**2+(y-np.imag(v.position))**2)*(4*viscosity*t)**(-1))*(32*np.pi*(viscosity*t)**3)**(-1) for v in vortices])
+        dw2dy2 = np.sum([v.Vstrength*(y**2-2*y*np.imag(v.position)+np.imag(v.position)**2-2*(viscosity*t))*np.exp(-((x-np.real(v.position))**2+(y-np.imag(v.position))**2)*(4*viscosity*t)**(-1))*(32*np.pi*(viscosity*t)**3)**(-1) for v in vortices])
+        dw2dxdy = np.sum([v.Vstrength*(y-np.imag(v.position))*(x-np.real(v.position))*np.exp(-((x-np.real(v.position))**2+(y-np.imag(v.position))**2)*(4*viscosity*t)**(-1))*(32*np.pi*(viscosity*t)**3)**(-1) for v in vortices])
+        detH = dw2dx2*dw2dy2-dw2dxdy**2
+        if detH > 0.0:
+            return 'peak'
+        if round(detH,1) == 0.0:
+            return 'saddle'
+        else:
+            #print(x,y, detH)
+            return 'none'
+
     def vorticity_field(self, vortices, t):
-        x = np.linspace(-9*SCREEN_WIDTH,10*SCREEN_WIDTH,  100)
-        y = np.linspace(-9*SCREEN_HEIGHT, 10*SCREEN_HEIGHT, 100)
+        x = np.linspace(-3*SCREEN_WIDTH,3*SCREEN_WIDTH,  100)
+        y = np.linspace(-3*SCREEN_HEIGHT, 3*SCREEN_HEIGHT, 100)
         Vort = np.zeros((len(x),len(y)))
         dwdx = np.zeros((len(x), len(y)))
         dwdy = np.zeros((len(x), len(y)))
-        dwdx2 = np.zeros((len(x),len(y)))
-        dwdy2 = np.zeros((len(x),len(y)))
-        dwdxdy = np.zeros((len(x),len(y)))
         dx = np.gradient(x).mean()
         dy = np.gradient(y).mean()
         crit_points = []
+        sadle = []
+        peaks = []
         for i in range(len(x)):
             for j in range(len(y)):
                 z = x[i]+1j*y[j]
                 Vort[i,j] = ((vortices[0].Vstrength/(4*np.pi*viscosity*t))*np.exp(-1*(np.abs(z-vortices[0].position)**2)/(4*viscosity*t)))+ ((vortices[1].Vstrength/(4*np.pi*viscosity*t))*np.exp(-1*(np.abs(z-vortices[1].position)**2)/(4*viscosity*t)))+((vortices[2].Vstrength/(4*np.pi*viscosity*t))*np.exp(-1*(np.abs(z-vortices[2].position)**2)/(4*viscosity*t)))
         for j in range(len(y)):
             dwdx[:, j] = np.divide(np.gradient(Vort[:,j]), dx)
-            dwdx2[:, j] = np.divide(np.gradient(dwdx[:,j]), dx)
-            dwdxdy[:, j] = np.divide(np.gradient(dwdx[:,j]),dy)
         for i in range(len(x)):
             dwdy[i, :] = np.divide(np.gradient(Vort[i,:]), dy)
-            dwdy2[i, :] = np.divide(np.gradient(dwdy[i,:]), dy)
         for i in range(len(x)):
             for j in range(len(y)):
                 signx = dwdx[i,j]/np.abs(dwdx[i,j])
                 nextsignx = dwdx[i-1,j]/np.abs(dwdx[i-1,j])
                 signy = dwdy[i,j]/np.abs(dwdy[i,j])
                 nextsigny = dwdy[i, j-1]/np.abs(dwdy[i,j-1])
-                detH = dwdx2*dwdy2-dwdxdy**2
                 if signx != nextsignx and signy !=nextsigny:
                     if dwdx[i,j] == 0:
                         xcoord = x[i]+1j*y[j]
@@ -142,13 +157,21 @@ class Vortex_interaction():
                         ycoord = x[i]+1j*-(by/ay)
                     zed = (xcoord+ycoord)/2
                     crit_points.append((np.real(zed), np.imag(zed)))
-        self.critical_points.append(crit_points)
-        print(detH)
+        for x, y in crit_points:
+            if self.labelCrits(x,y, vortices, t) == 'peak':
+                peaks.append((x,y))
+            if self.labelCrits(x,y, vortices, t) == 'saddle' and x>-4:
+                sadle.append((x,y))
+            else:
+                pass
+        self.Saddles.append(sadle)
+        self.Vort_peak.append(peaks)
+        #print(self.Saddles)
 
 
     def findStreamlines(self, v1, v2, v3, t):
-        x = np.linspace(-9*SCREEN_WIDTH,10*SCREEN_WIDTH,  60)
-        y = np.linspace(-9*SCREEN_HEIGHT, 10*SCREEN_HEIGHT, 60)
+        x = np.linspace(-3*SCREEN_WIDTH,3*SCREEN_WIDTH,  100)
+        y = np.linspace(-3*SCREEN_HEIGHT, 3*SCREEN_HEIGHT, 100)
         X, Y = np.meshgrid(x,y)
         z = X+1j*Y
 
@@ -171,20 +194,20 @@ vortexs = Vortex_interaction()
 
 ###initialize Point vortexes if chosen for this simulation
 if Sim_type == 'Point Vortex':
-    V1 = pvortex(Strength[0], ZeroZero[0], ZeroZero[1]-100)
-    V2 = pvortex(Strength[1], ZeroZero[0]-(200*np.tan(np.radians(30))), ZeroZero[1]+100)
-    V3 = pvortex(Strength[2], ZeroZero[0]+(200*np.tan(np.radians(30))), ZeroZero[1]+100)
+    V1 = pvortex(Strength[0], ZeroZero[0], ZeroZero[1]-1)
+    V2 = pvortex(Strength[1], ZeroZero[0]-(2*np.tan(np.radians(30))), ZeroZero[1]+1)
+    V3 = pvortex(Strength[2], ZeroZero[0]+(2*np.tan(np.radians(30))), ZeroZero[1]+1)
 
 
 ###initialize Gausian vortexes if chosen for this simulation
 if Sim_type == 'Core Growth':
-    V1 = cgvortex(Strength[0], ZeroZero[0], ZeroZero[1]-1500)
-    V2 = cgvortex(Strength[1], ZeroZero[0]-(3000*np.tan(np.radians(30))), ZeroZero[1]+1500)
-    V3 = cgvortex(Strength[2], ZeroZero[0]+(3000*np.tan(np.radians(30))), ZeroZero[1]+1500)
+    V1 = cgvortex(Strength[0], ZeroZero[0], ZeroZero[1]-1)
+    V2 = cgvortex(Strength[1], ZeroZero[0]-(2*np.tan(np.radians(30))), ZeroZero[1]+1)
+    V3 = cgvortex(Strength[2], ZeroZero[0]+(2*np.tan(np.radians(30))), ZeroZero[1]+1)
 
 ###SIMULATION LOOP IS HERE
 while run == True:
-    t = round(t + dt,1)
+    t = round(t + dt,2)
     #create white Background
     SCREEN.fill((255,255,255))
     for event in pygame.event.get():
@@ -197,7 +220,7 @@ while run == True:
 
     if Sim_type == 'Core Growth':
         vortexs.updateCGvortexes(V1, V2, V3, t)
-        if t%40 == 0:
+        if t%1 == 0:
             vortexs.findStreamlines(V1, V2, V3, t)
             vortexs.vorticity_field((V1,V2,V3), t)
     if Simulation == False:
@@ -206,7 +229,7 @@ while run == True:
     SupremeCounter -=1
     if SupremeCounter <= 0:
         break
-    print(t)
+    #print(t)
     pygame.display.update()
 
 
@@ -236,18 +259,22 @@ if Sim_type == 'Point Vortex':
     fig.savefig('fig.png')
 
 if Sim_type == 'Core Growth':
-    for SaveD, fieldloc, cps in zip(vortexs.SaveD, vortexs.fieldPos, vortexs.critical_points):
-        fig, (ax1, ax2) = plt.subplots(2,1, sharex = True)
+    Crits, critvt = plt.subplots()
+
+    for SaveD, fieldloc, sads, peks in zip(vortexs.SaveD, vortexs.fieldPos, vortexs.Saddles, vortexs.Vort_peak):
+        fig, ax2 = plt.subplots()
         vortexs.Vort_peak = []
         vortexs.Saddles = []
         #vortexs.crit_points(SaveD[2], fieldloc[2], fieldloc[3])
-        for peak in (vortexs.Vort_peak):
-            ax2.plot(peak[0], peak[1], '.')
         #ax2.plot(vortexs.Saddles, 'o')
-        ax2.plot([coord[0] for coord in cps], [coord[1]for coord in cps], 'o', color = 'red')
+        ax2.plot([coord[0] for coord in peks], [coord[1]for coord in peks], 'o', color = 'red')
+        ax2.plot([coord[0] for coord in sads], [coord[1]for coord in sads], 'o', color = 'green')
+        critvt.plot([coord[0] for coord in peks], [coord[1]for coord in peks], '.', color = 'red')
+        critvt.plot([coord[0] for coord in sads], [coord[1]for coord in sads], '.', color = 'green')
         #ax1.quiver(fieldloc[0], fieldloc[1], np.real(SaveD[0]), np.imag(SaveD[0]))
-        ax1.streamplot(fieldloc[0], fieldloc[1], np.real(SaveD[0]), np.imag(SaveD[0]), density = 1.75)
-        ax2.quiver(fieldloc[0], fieldloc[1], np.real(SaveD[2]), np.imag(SaveD[2]), scale = 0.5)
-        ax2.contour(fieldloc[2], fieldloc[3], SaveD[2], 20, cmap = 'turbo')
+        #ax1.streamplot(fieldloc[0], fieldloc[1], np.real(SaveD[0]), np.imag(SaveD[0]), density = 1.75)
+        #ax2.quiver(fieldloc[0], fieldloc[1], np.real(SaveD[2]), np.imag(SaveD[2]), scale = 0.5)
+        ax2.contour(fieldloc[2], fieldloc[3], SaveD[2], 100, cmap = 'turbo')
         #ax2.streamplot(fieldloc[0], fieldloc[1], np.real(SaveD[2]), np.imag(SaveD[2]), density = 2)
         fig.savefig(f'Figures/StreamlinesatTime_{SaveD[1]}.png')
+    Crits.savefig('test.png')
