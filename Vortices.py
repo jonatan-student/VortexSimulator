@@ -7,7 +7,7 @@ import pandas as pd
 #initialize pygame and plot generation
 pygame.init()
 
-_Directory = 'CG00dalet'
+_Directory = 'CG05dalet'
 
 if not os.path.exists(f"{_Directory}"):
     os.mkdir(f"{_Directory}")
@@ -24,7 +24,7 @@ ZeroZero =  0, 0                             #<--recenter (0,0) coordinate in ce
 dt =  .01                                     #<--timestep, lower means more accurate
 Sim_type = 'Core Growth'                     #<--Choose whether to run point vortex or coregrowth simulation
 Simulation = False                           #<--choose wether or not you want to see the simulation as it runs
-Strength = -1, 1, 0                         #<--Choose initial vortex strengths here , in order V1, v3, v2
+Strength = -1, .5, .5                         #<--Choose initial vortex strengths here , in order V1, v3, v2
 SupremeCounter = 1e4                         #<--number of iterations until loop breaks
 viscosity = .02                               #<--Choose a viscosity of the fluid here
 if Simulation ==True :
@@ -79,8 +79,10 @@ class Vortex_interaction():
         self.SaveD = []
         self.fieldPos = []
         self.critical_points = []
-        self.Vort_peak = []
+        self.Vort_peak_max = []
+        self.Vort_peak_min = []
         self.Saddles = []
+        self.advect = []
 
     def updatePVortexes(self, v1, v2, v3):
         v1_pos_temp = v1.position
@@ -108,8 +110,10 @@ class Vortex_interaction():
         dw2dy2 = np.sum([v.Vstrength*(y**2-2*y*np.imag(v.position)+np.imag(v.position)**2-2*(viscosity*t))*np.exp(-((x-np.real(v.position))**2+(y-np.imag(v.position))**2)*(4*viscosity*t)**(-1))*(32*np.pi*(viscosity*t)**3)**(-1) for v in vortices])
         dw2dxdy = np.sum([v.Vstrength*(y-np.imag(v.position))*(x-np.real(v.position))*np.exp(-((x-np.real(v.position))**2+(y-np.imag(v.position))**2)*(4*viscosity*t)**(-1))*(32*np.pi*(viscosity*t)**3)**(-1) for v in vortices])
         detH = dw2dx2*dw2dy2-dw2dxdy**2
-        if detH > 0.0:
-            return 'peak'
+        if detH > 0.0 and dw2dx2<0:
+            return 'maxpeak'
+        if detH>0.0 and dw2dx2>0:
+            return 'minpeak'
         if round(detH,1) == 0.0:
             return 'saddle'
         else:
@@ -126,7 +130,8 @@ class Vortex_interaction():
         dy = np.gradient(y).mean()
         crit_points = []
         sadle = []
-        peaks = []
+        maxpeaks = []
+        minpeaks = []
         for i in range(len(x)):
             for j in range(len(y)):
                 z = x[i]+1j*y[j]
@@ -160,15 +165,24 @@ class Vortex_interaction():
                     zed = (xcoord+ycoord)/2
                     crit_points.append((np.real(zed), np.imag(zed)))
         for x, y in crit_points:
-            if self.labelCrits(x,y, vortices, t) == 'peak':
-                peaks.append((x,y, t))
-            if self.labelCrits(x,y, vortices, t) == 'saddle' and x>-4:
+            if self.labelCrits(x,y, vortices, t) == 'maxpeak':
+                maxpeaks.append((x,y, t))
+            if self.labelCrits(x,y, vortices, t) == 'minpeak':
+                minpeaks.append((x,y,t))
+            if self.labelCrits(x,y, vortices, t) == 'saddle' and x>-2 and x<2.5 and y<2 and y>0:
                 sadle.append((x,y, t))
             else:
                 pass
         self.Saddles.append(sadle)
-        self.Vort_peak.append(peaks)
-        #print(self.Saddles)
+        self.Vort_peak_max.append(maxpeaks)
+        self.Vort_peak_min.append(minpeaks)
+        for sad, minpeak, maxpeak in zip(self.Saddles,self.Vort_peak_min, self.Vort_peak_max):
+            if len(sad)<=0:
+                advectangle = [(np.angle((m[0]+1j*m[1])-(p[0]+1j*p[1]), deg= True), p[2]) for m,p in zip(maxpeak, minpeak)]
+            else:
+                advectangle = [(np.angle((s[0]+1j*s[1])-(p[0]+1j*p[1]), deg= True), s[2] )for s,p in zip(sad, minpeak)]
+            self.advect.append(advectangle)
+        print(self.advect)
 
 
     def findStreamlines(self, v1, v2, v3, t):
@@ -258,25 +272,34 @@ if Sim_type == 'Point Vortex':
     ax.plot([np.real(V1.pastpositions[-1]), np.real(V3.pastpositions[-1])], [np.imag(V1.pastpositions[-1]), np.imag(V3.pastpositions[-1])],'--', color = 'BLACK')
 
     ax.legend()
-    fig.savefig('fig.png')
+    fig.savefig(f'{_Directory}/VortexPositions.png')
 
 if Sim_type == 'Core Growth':
     Crits, critvt = plt.subplots()
     PosvT , (xvt,yvt) = plt.subplots(2,1, sharex= True)
-
-    for SaveD, fieldloc, sads, peks in zip(vortexs.SaveD, vortexs.fieldPos, vortexs.Saddles, vortexs.Vort_peak):
+    angvt, angle = plt.subplots()
+    for SaveD, fieldloc, sads, minpeks, maxpeks in zip(vortexs.SaveD, vortexs.fieldPos, vortexs.Saddles, vortexs.Vort_peak_min, vortexs.Vort_peak_max):
         fig, ax2 = plt.subplots()
         vortexs.Vort_peak = []
         vortexs.Saddles = []
-        xvt.plot([coord[2] for coord in peks], [coord[0] for coord in peks], '.', color = 'red',label = 'Peak')
-        yvt.plot([coord[2] for coord in peks], [coord[1] for coord in peks], '.', color = 'red')
+        xvt.plot([coord[2] for coord in minpeks], [coord[0] for coord in minpeks], '.', color = 'red',label = 'Peak')
+        xvt.plot([coord[2] for coord in maxpeks], [coord[0] for coord in maxpeks], '.', color = 'blue',label = 'Peak')
+        yvt.plot([coord[2] for coord in minpeks], [coord[1] for coord in minpeks], '.', color = 'red')
+        yvt.plot([coord[2] for coord in maxpeks], [coord[1] for coord in maxpeks], '.', color = 'blue')
         xvt.plot([coord[2] for coord in sads], [coord[0] for coord in sads], '.', color = 'green', label = 'Saddle')
         yvt.plot( [coord[2] for coord in sads], [coord[1] for coord in sads], '.', color = 'green')
-        ax2.plot([coord[0] for coord in peks], [coord[1]for coord in peks], 'o', color = 'red')
+        ax2.plot([coord[0] for coord in minpeks], [coord[1]for coord in minpeks], 'o', color = 'red')
+        ax2.plot([coord[0] for coord in maxpeks], [coord[1]for coord in maxpeks], 'o', color = 'blue')
         ax2.plot([coord[0] for coord in sads], [coord[1]for coord in sads], 'o', color = 'green')
-        critvt.plot([coord[0] for coord in peks], [coord[1]for coord in peks], '.', color = 'red')
+        critvt.plot([coord[0] for coord in minpeks], [coord[1]for coord in minpeks], '.', color = 'red')
+        critvt.plot([coord[0] for coord in maxpeks], [coord[1]for coord in maxpeks], '.', color = 'blue')
         critvt.plot([coord[0] for coord in sads], [coord[1]for coord in sads], '.', color = 'green')
         ax2.contour(fieldloc[2], fieldloc[3], SaveD[2], 100, cmap = 'turbo')
         fig.savefig(f'{_Directory}/StreamlinesatTime_{SaveD[1]}.png')
+    for angles in vortexs.advect:
+        angle.plot([time[1]for time in angles], [angle[0]for angle in angles], '.', color = 'blue')
+
+    angle.set_ylim(-180, 180)
     Crits.savefig(f'{_Directory}/allPositions.png')
     PosvT.savefig(f'{_Directory}/PositionsVtime.png')
+    angvt.savefig(f'{_Directory}/AngleVtime.png')
