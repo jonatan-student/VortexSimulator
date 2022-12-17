@@ -7,7 +7,7 @@ import pandas as pd
 #initialize pygame and plot generation
 pygame.init()
 
-_Directory = 'CG05dalet'
+_Directory = 'CG00dalet'
 
 if not os.path.exists(f"{_Directory}"):
     os.mkdir(f"{_Directory}")
@@ -24,7 +24,7 @@ ZeroZero =  0, 0                             #<--recenter (0,0) coordinate in ce
 dt =  .01                                     #<--timestep, lower means more accurate
 Sim_type = 'Core Growth'                     #<--Choose whether to run point vortex or coregrowth simulation
 Simulation = False                           #<--choose wether or not you want to see the simulation as it runs
-Strength = -1, .5, .5                         #<--Choose initial vortex strengths here , in order V1, v3, v2
+Strength = -1, 1, 0                         #<--Choose initial vortex strengths here , in order V1, v3, v2
 SupremeCounter = 1e4                         #<--number of iterations until loop breaks
 viscosity = .02                               #<--Choose a viscosity of the fluid here
 if Simulation ==True :
