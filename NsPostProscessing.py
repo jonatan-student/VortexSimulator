@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.cluster import KMeans
 
-_Directory = "NS05dalet"
+_Directory = "NS00dalet"
 
 if not os.path.exists(_Directory):
     os.mkdir(_Directory)
@@ -56,8 +56,10 @@ for Time in range(101):
         kmeans.fit(Peaks)
         newPeaks = kmeans.cluster_centers_
         print([(c[0], c[1]) for c in newPeaks])
+    elif len(Peaks) <4:
+        newPeaks = Peaks
 
-    plt.contour(Xmesh, Ymesh, Vorticity_data, 100, cmap = 'turbo')
+    plt.contour(Xmesh, Ymesh, Vorticity_data, 50, cmap = 'turbo')
     #for c in newPeaks:
         #plt.plot(c[0], c[1], 'o', color = 'red')
     #plt.plot([c[0]for c in Saddles], [c[1]for c in Saddles], 'o', color = 'green')

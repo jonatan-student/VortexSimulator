@@ -7,13 +7,15 @@ import pandas as pd
 #initialize pygame and plot generation
 pygame.init()
 
-if not os.path.exists("Figures"):
-    os.mkdir("Figures")
+_Directory = 'CG00dalet'
+
+if not os.path.exists(f"{_Directory}"):
+    os.mkdir(f"{_Directory}")
 
 #__________glbl variables____________
 #display stuff
-SCREEN_HEIGHT = 2
-SCREEN_WIDTH = 2
+SCREEN_HEIGHT = 3
+SCREEN_WIDTH = 3
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 FONT = pygame.font.Font(pygame.font.get_default_font(), 20)
 
@@ -22,10 +24,10 @@ ZeroZero =  0, 0                             #<--recenter (0,0) coordinate in ce
 dt =  .01                                     #<--timestep, lower means more accurate
 Sim_type = 'Core Growth'                     #<--Choose whether to run point vortex or coregrowth simulation
 Simulation = False                           #<--choose wether or not you want to see the simulation as it runs
-Strength = -1, .5, .5                         #<--Choose initial vortex strengths here
+Strength = -1, 1, 0                         #<--Choose initial vortex strengths here , in order V1, v3, v2
 SupremeCounter = 1e4                         #<--number of iterations until loop breaks
 viscosity = .02                               #<--Choose a viscosity of the fluid here
-if Sim_type == 'Point Vortex':
+if Simulation ==True :
     SCREEN_HEIGHT = 900
     SCREEN_WIDTH = 900
     ZeroZero =  SCREEN_WIDTH/2, SCREEN_HEIGHT/2  #<--recenter (0,0) coordinate in center of graph
@@ -159,9 +161,9 @@ class Vortex_interaction():
                     crit_points.append((np.real(zed), np.imag(zed)))
         for x, y in crit_points:
             if self.labelCrits(x,y, vortices, t) == 'peak':
-                peaks.append((x,y))
+                peaks.append((x,y, t))
             if self.labelCrits(x,y, vortices, t) == 'saddle' and x>-4:
-                sadle.append((x,y))
+                sadle.append((x,y, t))
             else:
                 pass
         self.Saddles.append(sadle)
@@ -260,21 +262,21 @@ if Sim_type == 'Point Vortex':
 
 if Sim_type == 'Core Growth':
     Crits, critvt = plt.subplots()
+    PosvT , (xvt,yvt) = plt.subplots(2,1, sharex= True)
 
     for SaveD, fieldloc, sads, peks in zip(vortexs.SaveD, vortexs.fieldPos, vortexs.Saddles, vortexs.Vort_peak):
         fig, ax2 = plt.subplots()
         vortexs.Vort_peak = []
         vortexs.Saddles = []
-        #vortexs.crit_points(SaveD[2], fieldloc[2], fieldloc[3])
-        #ax2.plot(vortexs.Saddles, 'o')
+        xvt.plot([coord[2] for coord in peks], [coord[0] for coord in peks], '.', color = 'red',label = 'Peak')
+        yvt.plot([coord[2] for coord in peks], [coord[1] for coord in peks], '.', color = 'red')
+        xvt.plot([coord[2] for coord in sads], [coord[0] for coord in sads], '.', color = 'green', label = 'Saddle')
+        yvt.plot( [coord[2] for coord in sads], [coord[1] for coord in sads], '.', color = 'green')
         ax2.plot([coord[0] for coord in peks], [coord[1]for coord in peks], 'o', color = 'red')
         ax2.plot([coord[0] for coord in sads], [coord[1]for coord in sads], 'o', color = 'green')
         critvt.plot([coord[0] for coord in peks], [coord[1]for coord in peks], '.', color = 'red')
         critvt.plot([coord[0] for coord in sads], [coord[1]for coord in sads], '.', color = 'green')
-        #ax1.quiver(fieldloc[0], fieldloc[1], np.real(SaveD[0]), np.imag(SaveD[0]))
-        #ax1.streamplot(fieldloc[0], fieldloc[1], np.real(SaveD[0]), np.imag(SaveD[0]), density = 1.75)
-        #ax2.quiver(fieldloc[0], fieldloc[1], np.real(SaveD[2]), np.imag(SaveD[2]), scale = 0.5)
         ax2.contour(fieldloc[2], fieldloc[3], SaveD[2], 100, cmap = 'turbo')
-        #ax2.streamplot(fieldloc[0], fieldloc[1], np.real(SaveD[2]), np.imag(SaveD[2]), density = 2)
-        fig.savefig(f'Figures/StreamlinesatTime_{SaveD[1]}.png')
-    Crits.savefig('test.png')
+        fig.savefig(f'{_Directory}/StreamlinesatTime_{SaveD[1]}.png')
+    Crits.savefig(f'{_Directory}/allPositions.png')
+    PosvT.savefig(f'{_Directory}/PositionsVtime.png')
