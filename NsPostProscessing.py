@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.cluster import KMeans
 
-_Directory = "NS06dalet"
+_Directory = "NS05dalet"
 
 if not os.path.exists(_Directory):
     os.mkdir(_Directory)
